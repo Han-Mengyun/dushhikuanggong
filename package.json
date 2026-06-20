@@ -1,0 +1,20 @@
+{
+  "name": "stone-miner",
+  "version": "1.0.0",
+  "description": "赌石矿工 - 类似黄金矿工的挖矿赌石游戏",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "vite": "^4.5.14"
+  }
+}
