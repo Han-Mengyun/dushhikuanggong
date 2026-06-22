@@ -638,19 +638,23 @@ export class CutScene extends Scene {
       delay: 60,
     });
 
-    this.actionHint.setText('选择保留哪一半继续切，或取料');
+    this.actionHint.setText('自动保留较好的一边...');
     this.cutCountText.setText('已切 ' + (this.cutCount + 1) + ' 刀');
 
-    this.chooseLeftBtn.setVisible(true);
-    this.chooseRightBtn.setVisible(true);
-    this.chooseLeftBtn.setStyle({ color: this._leftHasJade  ? '#66ff66' : '#66aaff' });
-    this.chooseRightBtn.setStyle({ color: this._rightHasJade ? '#66ff66' : '#66aaff' });
-    this.takeBtn.setVisible(true);
-    this.takeBtn.setStyle({ color: '#ffcc00', backgroundColor: '#55330088' });
-
-    // 构建新网格用于3D观赏
-    this._build3DMesh();
-    this.modeBtn.setVisible(true);
+    // 不显示选半按钮，1.2秒后自动保留较好的一边
+    this.time.delayedCall(1200, () => {
+      // 判断哪边更好（有玉肉的一边优先）
+      let betterSide;
+      if (this._leftHasJade && !this._rightHasJade) {
+        betterSide = 'left';
+      } else if (this._rightHasJade && !this._leftHasJade) {
+        betterSide = 'right';
+      } else {
+        // 两边都有或都没有玉肉，随机选一边
+        betterSide = Math.random() > 0.5 ? 'left' : 'right';
+      }
+      this._chooseHalf(betterSide);
+    });
   }
 
   /**
@@ -888,8 +892,8 @@ export class CutScene extends Scene {
     burst.fillCircle(this.cutAreaX, this.cutAreaY, SECTION_RADIUS + 30);
     this.tweens.add({ targets: burst, alpha: 0, duration: 500 });
 
-    // 结果展示
-    this.resultText.setText(cutData.gemName);
+    // 结果展示——不透露具体玉种，只显示价值
+    this.resultText.setText(cutData.isGood ? '开出好料！' : '料子一般...');
     this.resultText.setColor(cutData.isGood ? '#ffcc00' : '#888888');
     this.resultText.setVisible(true);
 
@@ -897,7 +901,7 @@ export class CutScene extends Scene {
     this.valueText.setColor(cutData.isGood ? '#66ff66' : '#ff4444');
     this.valueText.setVisible(true);
 
-    this.actionHint.setText(cutData.isGood ? '好料！选择加工方式' : '可惜了...');
+    this.actionHint.setText(cutData.isGood ? '选择加工方式' : '可惜了...');
 
     // 宝石
     this.gemGfx.setVisible(true);

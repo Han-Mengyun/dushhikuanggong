@@ -224,25 +224,25 @@ export const BUYER_DATA = {
       chance: 0.35,          // 35%概率出现收购商
       offerMultiplier: 1.3,  // 收购价 = 100 * 1.3 = 130（比原价高，比首饰加工150低）
       buyerName: '玉石商老张',
-      buyerLine: '这块玛瑙色不错，我出{price}收了！',
+      buyerLine: '这料子色不错，我出{price}收了！',
     },
     hetianyu: {
       chance: 0.50,
       offerMultiplier: 1.6,  // 200 * 1.6 = 320（首饰400，摆件300）
       buyerName: '珠宝商李姐',
-      buyerLine: '和田玉！我出{price}，现钱！',
+      buyerLine: '好料子！我出{price}，现钱！',
     },
     feicui: {
       chance: 0.65,
       offerMultiplier: 1.8,  // 500 * 1.8 = 900（首饰1250，摆件900）
-      buyerName: '翡翠行王老板',
-      buyerLine: '好翡翠！{price}，一口价！',
+      buyerName: '珠宝行王老板',
+      buyerLine: '难得的好货！{price}，一口价！',
     },
     diwanglv: {
       chance: 0.80,
       offerMultiplier: 2.0,  // 1000 * 2.0 = 2000（首饰3000，摆件2000）
       buyerName: '收藏家赵先生',
-      buyerLine: '帝王绿！！{price}，我全包了！',
+      buyerLine: '极品！！{price}，我全包了！',
     },
     // 废石和普通料：不出收购商
     feishi: { chance: 0 },

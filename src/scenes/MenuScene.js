@@ -280,7 +280,7 @@ export class MenuScene extends Scene {
         // 结果 + 加工类型
         const craftLabel = result.craftType === 'jewelry' ? ' [\u9996\u9970]' : result.craftType === 'ornament' ? ' [\u6446\u4ef6]' : result.craftType === 'sold' ? ' [\u51fa\u552e]' : '';
         const finalVal = result.finalValue || result.gemResult.value;
-        this.add.text(x, y + 16, `${result.gemResult.name}${craftLabel} +${finalVal}`, {
+        this.add.text(x, y + 16, `料子${craftLabel} +${finalVal}`, {
           fontSize: '13px',
           fontFamily: 'Arial',
           color: result.gemResult.isGood ? '#66ff66' : '#ff6666',
