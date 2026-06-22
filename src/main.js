@@ -29,8 +29,15 @@ const config = {
     mode: Scale.FIT,
     autoCenter: Scale.CENTER_BOTH,
   },
+  input: {
+    activePointers: 3,
+    touch: {
+      capture: true,
+    },
+  },
   render: {
     antialias: true,
+    pixelArt: false,
   },
 };
 
