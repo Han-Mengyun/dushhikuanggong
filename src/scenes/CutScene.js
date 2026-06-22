@@ -49,6 +49,19 @@ export class CutScene extends Scene {
     this.currentPiece = null;   // 当前正在切的块 { points, centerX, centerY, radius }
     this.cutCount = 0;          // 当前石头已切次数
     this.bestPrecision = 0;     // 最佳精度
+
+    // 3D旋转状态
+    this._rotX = 0;
+    this._rotY = 0;
+    this._velX = 0;
+    this._velY = 0;
+    this._isDragging3D = false;
+    this._lastDragX = 0;
+    this._lastDragY = 0;
+    this._autoRotSpeed = 0.004;
+    this._stoneMesh = null;
+    this._viewMode = 'cut';    // 'cut' 切石模式 | 'view' 观赏模式
+    this._lastInteractTime = 0;
   }
 
   create() {
@@ -89,6 +102,29 @@ export class CutScene extends Scene {
     // 切面展示图形（两半 + 切面）
     this.halfLeftGfx = this.add.graphics();
     this.halfRightGfx = this.add.graphics();
+
+    // 3D石头渲染
+    this.stone3dGfx = this.add.graphics();
+    this.stone3dGfx.x = areaX;
+    this.stone3dGfx.y = areaY;
+    this.stone3dGfx.setVisible(false);
+
+    // 模式切换按钮（切石/观赏）
+    this.modeBtn = this.add.text(areaX + SECTION_RADIUS + 15, areaY - SECTION_RADIUS - 5, '观赏3D', {
+      fontSize: '12px', fontFamily: 'Arial', color: '#88aaff',
+      backgroundColor: '#22334488', padding: { x: 6, y: 3 },
+    }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
+    this.modeBtn.on('pointerdown', () => {
+      this._viewMode = this._viewMode === 'cut' ? 'view' : 'cut';
+      this.modeBtn.setText(this._viewMode === 'cut' ? '观赏3D' : '切石模式');
+      this.modeBtn.setStyle({ color: this._viewMode === 'cut' ? '#88aaff' : '#ffaa44' });
+      this._updateViewMode();
+    });
+
+    // 3D拖拽旋转提示
+    this.rotateHint = this.add.text(areaX, areaY + SECTION_RADIUS + 18, '拖拽旋转查看', {
+      fontSize: '11px', fontFamily: 'Arial', color: '#6688aa88',
+    }).setOrigin(0.5).setVisible(false);
 
     // 操作提示
     this.actionHint = this.add.text(areaX, areaY + 125, '在石头上拖动画切割线', {
@@ -185,9 +221,23 @@ export class CutScene extends Scene {
       if (this.state === STATE.ALL_DONE) this._goToResult();
     });
 
-    // 画线交互
+    // 画线 / 3D旋转 交互
     this.input.on('pointerdown', (pointer) => {
-      if (this.state === STATE.DRAW_LINE && pointer.x > 140) {
+      if (pointer.x <= 140) return;
+
+      // 观赏模式 → 拖拽旋转
+      if (this._viewMode === 'view' && this._stoneMesh) {
+        this._isDragging3D = true;
+        this._lastDragX = pointer.x;
+        this._lastDragY = pointer.y;
+        this._velX = 0;
+        this._velY = 0;
+        this._lastInteractTime = this.time.now;
+        return;
+      }
+
+      // 切石模式 → 画切割线
+      if (this.state === STATE.DRAW_LINE) {
         this.isDrawingLine = true;
         this.cutLineStart = {
           x: pointer.x - this.cutAreaX,
@@ -197,6 +247,22 @@ export class CutScene extends Scene {
       }
     });
     this.input.on('pointermove', (pointer) => {
+      // 3D旋转拖拽
+      if (this._isDragging3D) {
+        const dx = pointer.x - this._lastDragX;
+        const dy = pointer.y - this._lastDragY;
+        this._velY = dx * 0.008;
+        this._velX = dy * 0.008;
+        this._rotY += this._velY;
+        this._rotX += this._velX;
+        // 限制X轴旋转范围
+        this._rotX = Math.max(-Math.PI * 0.45, Math.min(Math.PI * 0.45, this._rotX));
+        this._lastDragX = pointer.x;
+        this._lastDragY = pointer.y;
+        return;
+      }
+
+      // 画切割线
       if (this.isDrawingLine && this.state === STATE.DRAW_LINE) {
         this.cutLineEnd = {
           x: pointer.x - this.cutAreaX,
@@ -207,6 +273,8 @@ export class CutScene extends Scene {
       }
     });
     this.input.on('pointerup', () => {
+      this._isDragging3D = false;
+
       if (this.isDrawingLine && this.state === STATE.DRAW_LINE) {
         this.isDrawingLine = false;
         if (this.cutLineStart && this.cutLineEnd) {
@@ -385,9 +453,19 @@ export class CutScene extends Scene {
 
   _executeCut() {
     this.state = STATE.CUTTING;
+
+    // 如果正在观赏模式，切回切石模式
+    if (this._viewMode === 'view') {
+      this._viewMode = 'cut';
+      this._updateViewMode();
+    }
+
     this.confirmCutBtn.setVisible(false);
     this.takeBtn.setVisible(false);
+    this.modeBtn.setVisible(false);
     this.cutLineGfx.clear();
+    this.stone3dGfx.setVisible(false);
+    this.rotateHint.setVisible(false);
     this.actionHint.setText('切割中...');
     this.precisionText.setText('');
 
@@ -569,6 +647,10 @@ export class CutScene extends Scene {
     this.chooseRightBtn.setStyle({ color: this._rightHasJade ? '#66ff66' : '#66aaff' });
     this.takeBtn.setVisible(true);
     this.takeBtn.setStyle({ color: '#ffcc00', backgroundColor: '#55330088' });
+
+    // 构建新网格用于3D观赏
+    this._build3DMesh();
+    this.modeBtn.setVisible(true);
   }
 
   /**
@@ -718,6 +800,16 @@ export class CutScene extends Scene {
 
     this.cutCount++;
 
+    // 退出观赏模式
+    if (this._viewMode === 'view') {
+      this._viewMode = 'cut';
+      this.stone3dGfx.setVisible(false);
+      this.sectionGfx.setVisible(true);
+      this.cutLineGfx.setVisible(true);
+      this.rotateHint.setVisible(false);
+      this._rotX = 0; this._rotY = 0; this._velX = 0; this._velY = 0;
+    }
+
     // 清除两半显示
     this.halfLeftGfx.clear();
     this.halfRightGfx.clear();
@@ -741,7 +833,14 @@ export class CutScene extends Scene {
     this.sectionGfx.x = this.cutAreaX;
     this.sectionGfx.y = this.cutAreaY;
     this.sectionGfx.setAlpha(1);
+    this.sectionGfx.setVisible(true);
     this._drawSection(index, this.currentPiece);
+
+    // 重建3D网格（新尺寸）
+    this._build3DMesh();
+    this.modeBtn.setVisible(true);
+    this.modeBtn.setText('观赏3D');
+    this.modeBtn.setStyle({ color: '#88aaff' });
 
     this.actionHint.setText('继续切割，或取料');
     this.takeBtn.setVisible(true);
@@ -760,6 +859,15 @@ export class CutScene extends Scene {
     const index = this.currentStoneIndex;
     const data = this.sectionData[index];
 
+    // 退出观赏模式
+    if (this._viewMode === 'view') {
+      this._viewMode = 'cut';
+      this.stone3dGfx.setVisible(false);
+      this.sectionGfx.setVisible(true);
+      this.cutLineGfx.setVisible(true);
+      this.rotateHint.setVisible(false);
+    }
+
     // 清除切面显示
     this.halfLeftGfx.clear();
     this.halfRightGfx.clear();
@@ -767,6 +875,7 @@ export class CutScene extends Scene {
     this.chooseRightBtn.setVisible(false);
     this.takeBtn.setVisible(false);
     this.confirmCutBtn.setVisible(false);
+    this.modeBtn.setVisible(false);
     this.cutLineGfx.clear();
     this.sectionGfx.clear();
 
@@ -1269,12 +1378,29 @@ export class CutScene extends Scene {
     this.halfRightGfx.clear();
     this.cutCountText.setText('已切 0 刀');
 
+    // 重置3D状态
+    this._viewMode = 'cut';
+    this._rotX = 0;
+    this._rotY = 0;
+    this._velX = 0;
+    this._velY = 0;
+    this.stone3dGfx.clear();
+    this.stone3dGfx.setVisible(false);
+    this.rotateHint.setVisible(false);
+    this.modeBtn.setText('观赏3D');
+    this.modeBtn.setStyle({ color: '#88aaff' });
+    this.modeBtn.setVisible(true);
+
     // 重置截面位置
     this.sectionGfx.x = this.cutAreaX;
     this.sectionGfx.y = this.cutAreaY;
     this.sectionGfx.setAlpha(1);
+    this.sectionGfx.setVisible(true);
 
     this._drawSection(index, null);
+
+    // 预构建3D网格（切换观赏模式时使用）
+    this._build3DMesh();
 
     this.actionHint.setText('在石头上拖动画切割线');
     this.precisionText.setText('');
@@ -1310,6 +1436,7 @@ export class CutScene extends Scene {
     this.state = STATE.ALL_DONE;
     this.finishBtn.setStyle({ color: '#ffcc00', backgroundColor: '#55330088' });
     this.finishBtn.setVisible(true);
+    this.modeBtn.setVisible(false);
   }
 
   // ==================== 数学工具 ====================
@@ -1347,6 +1474,178 @@ export class CutScene extends Scene {
       ownedHooks: this.ownedHooks,
       selectedHook: this.selectedHook,
     });
+  }
+
+  // ==================== 3D 石头渲染 ====================
+
+  /** 每帧更新：旋转惯性 + 自动旋转 */
+  update() {
+    if (!this._stoneMesh) return;
+
+    // 惯性衰减
+    if (!this._isDragging3D) {
+      this._velX *= 0.92;
+      this._velY *= 0.92;
+      this._rotX += this._velX;
+      this._rotY += this._velY;
+
+      // 松手后自动回正X轴
+      if (this.time.now - this._lastInteractTime > 600) {
+        this._rotX *= 0.97;
+        this._velX *= 0.9;
+      }
+
+      // 自动缓慢旋转Y
+      if (this.time.now - this._lastInteractTime > 1200) {
+        this._rotY += this._autoRotSpeed;
+      }
+    }
+
+    // 观赏模式时实时渲染
+    if (this._viewMode === 'view') {
+      this._renderStone3D();
+    }
+  }
+
+  /** 构建3D网格 */
+  _build3DMesh() {
+    const index = this.currentStoneIndex;
+    const data = this.sectionData[index];
+    const R = this.currentPiece ? this.currentPiece.radius : SECTION_RADIUS;
+    const outlinePts = StoneShape.generate(0, 0, R, data.shapeSeed, 0.35);
+    this._stoneMesh = StoneShape.generate3DMesh(outlinePts, R);
+    this._stoneMesh.R = R;
+    this._stoneMesh.outline = outlinePts;
+
+    // 为每个面赋予石头颜色
+    for (const face of this._stoneMesh.faces) {
+      switch (face.type) {
+        case 'front': face.color = data.outerColor; break;
+        case 'side':  face.color = data.outerColor; break;
+        case 'back':  face.color = this._darkenColor(data.outerColor, 0.6); break;
+      }
+    }
+  }
+
+  /** 渲染3D石头 */
+  _renderStone3D() {
+    const gfx = this.stone3dGfx;
+    const mesh = this._stoneMesh;
+    if (!mesh) return;
+
+    gfx.clear();
+
+    // 旋转所有顶点
+    const rotated = mesh.vertices.map(v => StoneShape.rotate3D(v, this._rotX, this._rotY));
+    // 透视投影
+    const projected = rotated.map(v => StoneShape.project3D(v));
+
+    // 准备面数据（计算深度和法线）
+    const renderFaces = [];
+    for (const face of mesh.faces) {
+      const verts3D = face.vi.map(i => rotated[i]);
+      const verts2D = face.vi.map(i => projected[i]);
+
+      // 面中心深度
+      const avgZ = verts3D.reduce((s, v) => s + v.z, 0) / verts3D.length;
+
+      // 法线
+      const normal = StoneShape.faceNormal(verts3D[0], verts3D[1], verts3D[2]);
+
+      // 背面剔除（法线朝后不显示）
+      if (normal.z < -0.05) continue;
+
+      renderFaces.push({ verts2D, verts3D, avgZ, normal, face });
+    }
+
+    // 按深度从远到近排序（远的先画）
+    renderFaces.sort((a, b) => a.avgZ - b.avgZ);
+
+    // 光源方向（左上前方）
+    const lx = 0.3, ly = -0.4, lz = 0.87;
+    const lLen = Math.sqrt(lx * lx + ly * ly + lz * lz);
+    const lnx = lx / lLen, lny = ly / lLen, lnz = lz / lLen;
+
+    // 绘制每个面
+    for (const rf of renderFaces) {
+      const { verts2D, normal, face } = rf;
+      const baseColor = face.color;
+
+      // 漫反射光照
+      const diffuse = Math.max(0, normal.x * lnx + normal.y * lny + normal.z * lnz);
+      const ambient = 0.38;
+      const brightness = ambient + 0.62 * diffuse;
+
+      // 边缘高光（面向观察者时微微发亮）
+      const facing = Math.max(0, normal.z);
+      const spec = facing > 0.8 ? (facing - 0.8) * 2.5 : 0;
+
+      const litColor = this._brightenColor(baseColor, brightness);
+      const finalColor = spec > 0 ? this._mixColor(litColor, 0xffffff, spec * 0.3) : litColor;
+
+      gfx.fillStyle(finalColor, 1);
+      gfx.beginPath();
+      gfx.moveTo(verts2D[0].x, verts2D[0].y);
+      for (let i = 1; i < verts2D.length; i++) {
+        gfx.lineTo(verts2D[i].x, verts2D[i].y);
+      }
+      gfx.closePath();
+      gfx.fillPath();
+
+      // 描边增加立体感
+      const edgeColor = this._brightenColor(baseColor, brightness * 0.75);
+      gfx.lineStyle(0.6, edgeColor, 0.7);
+      gfx.strokePath();
+    }
+
+    // 正面时绘制截面提示（淡色圆圈暗示内部玉肉位置）
+    if (this._rotX < 0.2 && this._rotX > -0.2 && Math.abs(this._rotY % (Math.PI * 2)) < 0.3) {
+      const data = this.sectionData[this.currentStoneIndex];
+      const R = mesh.R;
+      const frontZ = R * 0.55;
+      const fPt = StoneShape.rotate3D({ x: 0, y: 0, z: frontZ }, this._rotX, this._rotY);
+      const fProj = StoneShape.project3D(fPt);
+
+      // 玉肉暗示圈
+      gfx.fillStyle(data.jadeColor, 0.12);
+      gfx.fillCircle(fProj.x, fProj.y, data.jadeRadius * 0.6);
+      gfx.lineStyle(1, data.jadeColor, 0.2);
+      gfx.strokeCircle(fProj.x, fProj.y, data.jadeRadius * 0.6);
+    }
+  }
+
+  /** 切换观赏/切石模式 */
+  _updateViewMode() {
+    if (this._viewMode === 'view') {
+      // 进入观赏模式：隐藏2D截面，显示3D
+      this.sectionGfx.setVisible(false);
+      this.stone3dGfx.setVisible(true);
+      this.cutLineGfx.setVisible(false);
+      this.confirmCutBtn.setVisible(false);
+      this.rotateHint.setVisible(true);
+      this.actionHint.setText('拖拽旋转石头，查看全方位');
+
+      // 构建网格
+      if (this.state === STATE.DRAW_LINE) {
+        this._build3DMesh();
+        this._renderStone3D();
+      }
+    } else {
+      // 回到切石模式：显示2D截面，隐藏3D
+      this.sectionGfx.setVisible(true);
+      this.stone3dGfx.setVisible(false);
+      this.cutLineGfx.setVisible(true);
+      this.rotateHint.setVisible(false);
+      this._rotX = 0;
+      this._rotY = 0;
+      this._velX = 0;
+      this._velY = 0;
+
+      if (this.state === STATE.DRAW_LINE) {
+        this.actionHint.setText('在石头上拖动画切割线');
+        this.takeBtn.setVisible(true);
+      }
+    }
   }
 
   _drawBackground() {

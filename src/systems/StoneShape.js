@@ -178,4 +178,137 @@ export class StoneShape {
       return (s - 1) / 2147483646;
     };
   }
+
+  // ==================== 3D 网格与渲染工具 ====================
+
+  /**
+   * 从2D轮廓生成3D石头网格（顶点 + 面）
+   * 结构：前盖 + 多层环带侧面 + 后盖，模拟椭球体深度
+   */
+  static generate3DMesh(outlinePoints, R) {
+    const N = outlinePoints.length;
+    const LAYERS = 7;
+    const vertices = [];
+    const faces = [];
+
+    // 辅助：计算角度对应的轮廓半径（射线-多边形交点）
+    const radii = outlinePoints.map(p => Math.hypot(p.x, p.y));
+    const angles = outlinePoints.map(p => Math.atan2(p.y, p.x));
+
+    function radiusAtAngle(theta) {
+      let best = R;
+      for (let j = 0; j < N; j++) {
+        const k = (j + 1) % N;
+        let a1 = angles[j], a2 = angles[k];
+        let t = theta;
+        // 规范化角度差
+        let d1 = ((a2 - a1) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+        let d0 = ((t - a1) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+        if (d1 === 0) continue;
+        const f = d0 / d1;
+        if (f >= -0.01 && f <= 1.01) {
+          const r = radii[j] * (1 - f) + radii[k] * f;
+          best = Math.min(best, r);
+        }
+      }
+      return best;
+    }
+
+    // 生成层环顶点
+    const rings = [];
+    for (let layer = 0; layer <= LAYERS; layer++) {
+      const phi = (Math.PI * layer) / LAYERS; // 0(前) → π(后)
+      const zFactor = Math.cos(phi);
+      const shrink = Math.sin(phi); // 赤道=1，极点=0
+      const ring = [];
+      for (let i = 0; i < N; i++) {
+        const baseR = radii[i];
+        const r = baseR * Math.max(0.08, shrink);
+        ring.push({
+          x: outlinePoints[i].x * Math.max(0.08, shrink),
+          y: outlinePoints[i].y * Math.max(0.08, shrink),
+          z: R * zFactor * 0.55,
+        });
+      }
+      rings.push(ring);
+    }
+
+    // 前极点
+    const frontCenterIdx = vertices.length;
+    vertices.push({ x: 0, y: 0, z: R * 0.55 });
+
+    // 添加所有环顶点
+    for (const ring of rings) {
+      const baseIdx = vertices.length;
+      for (const v of ring) {
+        vertices.push({ x: v.x, y: v.y, z: v.z });
+      }
+    }
+
+    // 前盖扇面（法线朝 +Z）
+    const r0Base = 1; // 第0环的顶点起始索引
+    for (let i = 0; i < N; i++) {
+      faces.push({
+        vi: [frontCenterIdx, r0Base + i, r0Base + (i + 1) % N],
+        type: 'front', color: 0x888888,
+      });
+    }
+
+    // 侧面环带
+    for (let layer = 0; layer < LAYERS; layer++) {
+      const aBase = 1 + layer * N;
+      const bBase = 1 + (layer + 1) * N;
+      for (let i = 0; i < N; i++) {
+        const j = (i + 1) % N;
+        faces.push({
+          vi: [aBase + i, aBase + j, bBase + j, bBase + i],
+          type: 'side', color: 0x888888,
+        });
+      }
+    }
+
+    // 后盖扇面（法线朝 -Z）
+    const rLastBase = 1 + LAYERS * N;
+    const backCenterIdx = vertices.length;
+    vertices.push({ x: 0, y: 0, z: -R * 0.55 });
+
+    for (let i = 0; i < N; i++) {
+      faces.push({
+        vi: [backCenterIdx, rLastBase + (i + 1) % N, rLastBase + i],
+        type: 'back', color: 0x555555,
+      });
+    }
+
+    return { vertices, faces };
+  }
+
+  /** 3D点旋转（先X后Y） */
+  static rotate3D(p, rx, ry) {
+    const cx1 = Math.cos(rx), sx1 = Math.sin(rx);
+    const y1 = p.y * cx1 - p.z * sx1;
+    const z1 = p.y * sx1 + p.z * cx1;
+    const cy2 = Math.cos(ry), sy2 = Math.sin(ry);
+    return {
+      x: p.x * cy2 + z1 * sy2,
+      y: y1,
+      z: -p.x * sy2 + z1 * cy2,
+    };
+  }
+
+  /** 透视投影 */
+  static project3D(p, scale = 1, focal = 500) {
+    const f = focal / (focal + p.z);
+    return { x: p.x * f * scale, y: p.y * f * scale, z: p.z };
+  }
+
+  /** 计算面法线（用于光照和背面剔除） */
+  static faceNormal(p0, p1, p2) {
+    const ax = p1.x - p0.x, ay = p1.y - p0.y, az = p1.z - p0.z;
+    const bx = p2.x - p0.x, by = p2.y - p0.y, bz = p2.z - p0.z;
+    const nx = ay * bz - az * by;
+    const ny = az * bx - ax * bz;
+    const nz = ax * by - ay * bx;
+    const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+    return { x: nx / len, y: ny / len, z: nz / len };
+  }
 }
