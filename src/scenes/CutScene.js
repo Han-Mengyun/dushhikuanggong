@@ -922,6 +922,9 @@ export class CutScene extends Scene {
     // 保存结果
     this.stoneCutResults[index] = cutData;
 
+    // 设置状态为加工选择
+    this.state = STATE.CRAFT;
+
     // 检测收购商（好料才有收购商出现）
     if (cutData.isGood) {
       const jadeExposed = this.currentPiece ? this.currentPiece.hasJade : false;
