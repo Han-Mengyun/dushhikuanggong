@@ -192,133 +192,88 @@ export class Claw {
     this.clawHead.clear();
     this.clawHead.x        = tip.x;
     this.clawHead.y        = tip.y;
-    this.clawHead.rotation = this.angle;   // 钩爪始终朝向伸出方向（与绳子同向）
+    this.clawHead.rotation = -this.angle;  // 钩爪本地Y轴与绳子伸出方向一致
 
     this._drawHookShape(this.clawHead, h);
   }
 
   /**
    * 根据钩子类型绘制不同形状的钩爪
-   * 全部简化为沿绳子方向的直线造型，钩爪与绳子呈一条直线
+   * 本地Y轴朝下为钩爪朝向，绘制时整体旋转到绳子方向。
    */
   _drawHookShape(g, h) {
     const s = h.size || 8;
     const c = h.color;
     const dark  = this._darken(c, 0.6);
     const light = this._brighten(c, 1.7);
-    const half = s * 0.35;
+    const strokeW = Math.max(3, s * 0.34);
+    const bodyLen = s * 1.25;
+    const armLen = s * 1.55;
+    const spread = s * 1.1;
+    const jawLift = s * 0.45;
+    const barbSize = s * 0.45;
 
-    // 所有钩子统一结构：绳头连接块 + 沿Y轴方向的钩齿
-    // 钩齿朝下（Y正方向），与绳子伸出方向一致
+    const drawPath = (color, width, alpha, offsetX = 0, offsetY = 0) => {
+      g.lineStyle(width, color, alpha);
 
-    // ---- 连接块（绳子末端的小接头） ----
+      // 主钩身：从绳子末端沿绳子方向伸出。
+      g.beginPath();
+      g.moveTo(offsetX, offsetY);
+      g.lineTo(offsetX, bodyLen + offsetY);
+      g.strokePath();
+
+      // 左弯爪。
+      g.beginPath();
+      g.moveTo(offsetX, bodyLen + offsetY);
+      g.lineTo(-spread * 0.45 + offsetX, bodyLen + armLen * 0.18 + offsetY);
+      g.lineTo(-spread + offsetX, bodyLen + armLen * 0.62 + offsetY);
+      g.lineTo(-spread * 0.72 + offsetX, bodyLen + armLen + offsetY);
+      g.lineTo(-spread * 0.24 + offsetX, bodyLen + armLen - jawLift + offsetY);
+      g.strokePath();
+
+      // 右弯爪。
+      g.beginPath();
+      g.moveTo(offsetX, bodyLen + offsetY);
+      g.lineTo(spread * 0.45 + offsetX, bodyLen + armLen * 0.18 + offsetY);
+      g.lineTo(spread + offsetX, bodyLen + armLen * 0.62 + offsetY);
+      g.lineTo(spread * 0.72 + offsetX, bodyLen + armLen + offsetY);
+      g.lineTo(spread * 0.24 + offsetX, bodyLen + armLen - jawLift + offsetY);
+      g.strokePath();
+    };
+
+    drawPath(0x000000, strokeW + 3, 0.22, 1, 1);
+    drawPath(dark, strokeW + 2, 1);
+    drawPath(c, strokeW, 1);
+
+    // 顶部绳环和钩身关节，让绳子与钩爪衔接自然。
     g.fillStyle(dark, 1);
-    g.fillRect(-half, -s * 0.15, half * 2, s * 0.3);
+    g.fillCircle(0, 0, strokeW * 0.9);
+    g.fillCircle(0, bodyLen, strokeW * 0.9);
     g.fillStyle(c, 1);
-    g.fillRect(-half * 0.8, -s * 0.1, half * 1.6, s * 0.2);
+    g.fillCircle(0, 0, strokeW * 0.62);
+    g.fillCircle(0, bodyLen, strokeW * 0.62);
+    g.fillStyle(light, 0.55);
+    g.fillCircle(-strokeW * 0.18, -strokeW * 0.18, strokeW * 0.22);
 
-    switch (h.key) {
-      // ---- 铁锈钩：2根短齿 ----
-      case 'rustHook': {
-        const toothLen = s * 0.9;
-        const toothW = half * 0.7;
-        // 左齿
-        g.fillStyle(dark, 1);
-        g.fillRect(-half * 1.1, 0, toothW, toothLen);
-        g.fillStyle(c, 1);
-        g.fillRect(-half, 0, toothW * 0.8, toothLen * 0.9);
-        // 右齿
-        g.fillStyle(dark, 1);
-        g.fillRect(half * 0.4, 0, toothW, toothLen);
-        g.fillStyle(c, 1);
-        g.fillRect(half * 0.5, 0, toothW * 0.8, toothLen * 0.9);
-        break;
-      }
+    // 爪尖朝内，能一眼看出是抓取用的双爪钩。
+    g.fillStyle(dark, 1);
+    g.fillTriangle(
+      -spread * 0.24, bodyLen + armLen - jawLift,
+      -spread * 0.24 - barbSize, bodyLen + armLen - jawLift * 0.25,
+      -spread * 0.24 + barbSize * 0.2, bodyLen + armLen - jawLift * 0.05,
+    );
+    g.fillTriangle(
+      spread * 0.24, bodyLen + armLen - jawLift,
+      spread * 0.24 + barbSize, bodyLen + armLen - jawLift * 0.25,
+      spread * 0.24 - barbSize * 0.2, bodyLen + armLen - jawLift * 0.05,
+    );
 
-      // ---- 精钢钩：2根中等长度齿 ----
-      case 'steelHook': {
-        const toothLen = s * 1.2;
-        const toothW = half * 0.6;
-        // 左齿
-        g.fillStyle(dark, 1);
-        g.fillRect(-half * 1.0, 0, toothW, toothLen);
-        g.fillStyle(c, 1);
-        g.fillRect(-half * 0.9, 0, toothW * 0.8, toothLen * 0.9);
-        // 右齿
-        g.fillStyle(dark, 1);
-        g.fillRect(half * 0.4, 0, toothW, toothLen);
-        g.fillStyle(c, 1);
-        g.fillRect(half * 0.5, 0, toothW * 0.8, toothLen * 0.9);
-        // 高光
-        g.fillStyle(light, 0.5);
-        g.fillCircle(0, toothLen * 0.3, half * 0.3);
-        break;
-      }
-
-      // ---- 合金钩：3根长齿，流线型 ----
-      case 'alloyHook': {
-        const toothLen = s * 1.4;
-        const toothW = half * 0.5;
-        // 左齿
-        g.fillStyle(dark, 1);
-        g.fillRect(-half * 1.2, 0, toothW, toothLen);
-        g.fillStyle(c, 1);
-        g.fillRect(-half * 1.1, 0, toothW * 0.8, toothLen * 0.9);
-        // 中齿
-        g.fillStyle(dark, 1);
-        g.fillRect(-toothW * 0.5, 0, toothW, toothLen * 1.1);
-        g.fillStyle(c, 1);
-        g.fillRect(-toothW * 0.4, 0, toothW * 0.8, toothLen * 1.0);
-        // 右齿
-        g.fillStyle(dark, 1);
-        g.fillRect(half * 0.7, 0, toothW, toothLen);
-        g.fillStyle(c, 1);
-        g.fillRect(half * 0.8, 0, toothW * 0.8, toothLen * 0.9);
-        // 高光线
-        g.lineStyle(1, light, 0.5);
-        g.beginPath(); g.moveTo(0, -half); g.lineTo(0, toothLen * 0.8); g.strokePath();
-        break;
-      }
-
-      // ---- 钻石钩：3根长齿，带倒刺 ----
-      case 'diamondHook': {
-        const toothLen = s * 1.6;
-        const toothW = half * 0.5;
-        // 左齿（带倒刺）
-        g.fillStyle(dark, 1);
-        g.fillRect(-half * 1.3, 0, toothW, toothLen);
-        g.fillStyle(c, 1);
-        g.fillRect(-half * 1.2, 0, toothW * 0.8, toothLen * 0.9);
-        // 倒刺
-        g.fillStyle(c, 1);
-        g.fillTriangle(-half * 1.3, toothLen * 0.5, -half * 1.7, toothLen * 0.5, -half * 1.3, toothLen * 0.7);
-        // 中齿
-        g.fillStyle(dark, 1);
-        g.fillRect(-toothW * 0.5, 0, toothW, toothLen * 1.2);
-        g.fillStyle(c, 1);
-        g.fillRect(-toothW * 0.4, 0, toothW * 0.8, toothLen * 1.1);
-        // 右齿（带倒刺）
-        g.fillStyle(dark, 1);
-        g.fillRect(half * 0.8, 0, toothW, toothLen);
-        g.fillStyle(c, 1);
-        g.fillRect(half * 0.9, 0, toothW * 0.8, toothLen * 0.9);
-        // 倒刺
-        g.fillStyle(c, 1);
-        g.fillTriangle(half * 1.0, toothLen * 0.5, half * 1.4, toothLen * 0.5, half * 1.0, toothLen * 0.7);
-        // 高光
-        g.fillStyle(light, 0.6);
-        g.fillCircle(0, 0, half * 0.5);
-        break;
-      }
-
-      // 默认：2根简单齿
-      default: {
-        const toothLen = s * 1.0;
-        const toothW = half * 0.6;
-        g.fillStyle(c, 1);
-        g.fillRect(-half * 1.0, 0, toothW, toothLen);
-        g.fillRect(half * 0.4, 0, toothW, toothLen);
-      }
+    if (h.key === 'diamondHook' || h.key === 'alloyHook') {
+      g.lineStyle(1, light, 0.72);
+      g.beginPath();
+      g.moveTo(-strokeW * 0.35, strokeW * 0.25);
+      g.lineTo(-strokeW * 0.35, bodyLen + armLen * 0.45);
+      g.strokePath();
     }
   }
 

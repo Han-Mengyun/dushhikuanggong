@@ -42,3 +42,39 @@ const config = {
 };
 
 const game = new Game(config);
+
+const rotateButton = document.getElementById('rotate-lock-button');
+const rotateStatus = document.getElementById('rotate-status');
+
+async function requestLandscapeMode() {
+  if (!rotateStatus) return;
+
+  rotateStatus.textContent = '正在请求横屏...';
+
+  try {
+    const root = document.documentElement;
+
+    if (!document.fullscreenElement && root.requestFullscreen) {
+      await root.requestFullscreen();
+    }
+
+    if (screen.orientation?.lock) {
+      await screen.orientation.lock('landscape');
+      rotateStatus.textContent = '已进入横屏模式。';
+      game.scale.refresh();
+      return;
+    }
+
+    rotateStatus.textContent = '当前浏览器不支持自动横屏，请手动旋转手机。';
+  } catch (error) {
+    rotateStatus.textContent = '无法自动横屏，请关闭竖屏锁定后手动旋转手机。';
+  }
+}
+
+function refreshGameScale() {
+  game.scale.refresh();
+}
+
+rotateButton?.addEventListener('click', requestLandscapeMode);
+window.addEventListener('orientationchange', refreshGameScale);
+window.addEventListener('resize', refreshGameScale);
