@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="screen-orientation" content="landscape" />
+  <link rel="manifest" href="manifest.webmanifest" />
   <title>赌石矿工</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -13,6 +15,7 @@
       background: #1a1a2e;
       width: 100%;
       height: 100%;
+      height: 100dvh;
       overflow: hidden;
       touch-action: none;
       -webkit-touch-callout: none;
@@ -26,8 +29,8 @@
       align-items: center;
     }
     #game-container {
-      width: 100%;
-      height: 100%;
+      width: 100vw;
+      height: 100dvh;
       border-radius: 0;
       overflow: hidden;
       box-shadow: none;
@@ -50,6 +53,8 @@
       color: #ffcc00;
       font-family: Arial, sans-serif;
       text-align: center;
+      padding: 24px;
+      pointer-events: none;
     }
     #rotate-hint .icon {
       font-size: 64px;
@@ -60,22 +65,47 @@
       font-size: 18px;
       color: #ffffff;
     }
+    #rotate-lock-button {
+      margin-top: 24px;
+      min-width: 160px;
+      min-height: 44px;
+      padding: 0 18px;
+      border: 2px solid #ffcc00;
+      border-radius: 8px;
+      background: #ffcc00;
+      color: #1a1a2e;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    #rotate-status {
+      margin-top: 14px;
+      max-width: 320px;
+      min-height: 20px;
+      color: rgba(255, 255, 255, 0.76);
+      font-size: 13px;
+      line-height: 1.5;
+    }
     @keyframes rotate-anim {
       0%, 100% { transform: rotate(0deg); }
       50% { transform: rotate(90deg); }
     }
     /* 竖屏时显示旋转提示 */
     @media (orientation: portrait) and (max-width: 768px) {
-      #rotate-hint { display: flex; }
-      #game-container { display: none; }
+      #rotate-hint {
+        display: flex;
+        pointer-events: auto;
+      }
     }
   </style>
-  <script type="module" crossorigin src="/dushhikuanggong/assets/index-2dd5d6ca.js"></script>
+  <script type="module" crossorigin src="/dushhikuanggong/assets/index-3e749158.js"></script>
 </head>
 <body>
   <div id="rotate-hint">
     <div class="icon">📱</div>
     <div class="text">请横屏游玩以获得最佳体验</div>
+    <button id="rotate-lock-button" type="button">横屏游玩</button>
+    <div id="rotate-status">如果手机开启了竖屏锁定，请先关闭后再点击。</div>
   </div>
   <div id="game-container"></div>
   
